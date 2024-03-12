@@ -1,7 +1,12 @@
-﻿using System;
+﻿using Autodesk.Revit.DB;
+using Autodesk.Revit.UI;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Windows.Controls;
 
 namespace RAA_GetThumbnails
 {
@@ -11,7 +16,13 @@ namespace RAA_GetThumbnails
 		public static extern bool DeleteObject(IntPtr hObject);
 		public static List<ImageEntity> GetAllImagesData(List<string> listFamilyFiles)
 		{
-			try
+
+            // this is a variable for the Revit application
+            UIApplication uiapp = commandData.Application;
+            // this is a variable for the current Revit model
+            Document doc = uiapp.ActiveUIDocument.Document;
+
+            try
 			{
 				// return images data
 				//int THUMB_SIZE = 256;
@@ -23,24 +34,44 @@ namespace RAA_GetThumbnails
 					ie.ImagePath = familyFile;
 					ie.FileName = Path.GetFileNameWithoutExtension(familyFile);
 
-					//Bitmap thumbnail = WindowsThumbnailProvider.GetThumbnail(familyFile, THUMB_SIZE, THUMB_SIZE, ThumbnailOptions.None);
+                    //Bitmap thumbnail = WindowsThumbnailProvider.GetThumbnail(familyFile, THUMB_SIZE, THUMB_SIZE, ThumbnailOptions.None);
 
-					using (System.Drawing.Bitmap bmp = new System.Drawing.Bitmap(THUMB_SIZE, THUMB_SIZE))
-					{
-						IntPtr hBitmap = WindowsThumbnailProvider.GetThumbnail(familyFile, THUMB_SIZE, THUMB_SIZE, ThumbnailOptions.None);
+                    FilteredElementCollector collector = new FilteredElementCollector(doc);
 
-						try
-						{
-							ie.ImageBitmap = System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap(
-								hBitmap, IntPtr.Zero, System.Windows.Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
-						}
-						finally
-						{
-							DeleteObject(hBitmap);
-						}
-					}
+                    collector.OfClass(typeof(FamilyInstance));
 
-					list.Add(ie);
+                    foreach (FamilyInstance fi in collector)
+                    {
+                        Debug.Assert(null != fi.Category, "expected family instance to have a valid category");
+                        ElementId typeId = fi.GetTypeId();
+
+                        ElementType type = doc.GetElement(typeId) as ElementType;
+
+                        Size imgSize = new Size(200, 200);
+
+                        Bitmap image = type.GetPreviewImage(imgSize);
+
+                        var codeBitmap = new Bitmap(image);
+                        Image _image = (Image)codeBitmap;
+
+                    }
+
+                    using (System.Drawing.Bitmap bmp = new System.Drawing.Bitmap(THUMB_SIZE, THUMB_SIZE))
+                    {
+                        IntPtr hBitmap = WindowsThumbnailProvider.GetThumbnail(familyFile, THUMB_SIZE, THUMB_SIZE, ThumbnailOptions.None);
+
+                        try
+                        {
+                            ie.ImageBitmap = System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap(
+                                hBitmap, IntPtr.Zero, System.Windows.Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
+                        }
+                        finally
+                        {
+                            DeleteObject(hBitmap);
+                        }
+                    }
+
+                    list.Add(ie);
 				}
 				return list;
 			}
@@ -55,5 +86,6 @@ namespace RAA_GetThumbnails
 		public string ImagePath { get; set; }
 		public string FileName { get; set; }
 		public System.Windows.Media.ImageSource ImageBitmap { get; set; }
-	}
+        public virtual Bitmap elementTypeBitmap { get; set; }
+    }
 }
