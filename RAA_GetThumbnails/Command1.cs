@@ -1,4 +1,3 @@
-#region Namespaces
 using Autodesk.Revit.ApplicationServices;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
@@ -10,47 +9,79 @@ using System.Diagnostics;
 using System.Reflection;
 using System.IO;
 using System.Linq;
-#endregion
+using System.Drawing; // Add this namespace for Image
 
 namespace RAA_GetThumbnails
 {
-	[Transaction(TransactionMode.Manual)]
-	public class Command1 : IExternalCommand
-	{
-		public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
-		{
-			// this is a variable for the Revit application
-			UIApplication uiapp = commandData.Application;
+    // Define the ImageEntity class to hold image data
+    public class ImageEntity
+    {
+        public string Name { get; set; }
+        public Image Image { get; set; }
+    }
 
-			// this is a variable for the current Revit model
-			Document doc = uiapp.ActiveUIDocument.Document;
+    [Transaction(TransactionMode.Manual)]
+    public class Command1 : IExternalCommand
+    {
+        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        {
+            // this is a variable for the Revit application
+            UIApplication uiapp = commandData.Application;
 
-			// Get image thumbnails from a folder
-			string filePath = @"C:\ProgramData\Autodesk\RVT 2023\Libraries\English\Structural Precast\Mounting Parts";
-			List<string> fileList = Directory.GetFiles(filePath).ToList<string>();
-			List<ImageEntity> imageData = ImageView.GetAllImagesData(fileList);
+            // this is a variable for the current Revit model
+            Document doc = uiapp.ActiveUIDocument.Document;
 
-			// Show the images in a window
-			ImageWindow imageWindow = new ImageWindow(imageData);
-			imageWindow.ShowDialog();
+            // Get image thumbnails from elements in the document
+            List<ImageEntity> imageData = GetElementThumbnails(doc);
 
-			return Result.Succeeded;
-		}
-		internal static PushButtonData GetButtonData()
-		{
-			// use this method to define the properties for this command in the Revit ribbon
-			string buttonInternalName = "btnCommand1";
-			string buttonTitle = "Button 1";
+            // Show the images in a window
+            ImageWindow imageWindow = new ImageWindow(imageData);
+            imageWindow.ShowDialog();
 
-			ButtonDataClass myButtonData1 = new ButtonDataClass(
-				buttonInternalName,
-				buttonTitle,
-				MethodBase.GetCurrentMethod().DeclaringType?.FullName,
-				Properties.Resources.Blue_32,
-				Properties.Resources.Blue_16,
-				"This is a tooltip for Button 1");
+            return Result.Succeeded;
+        }
 
-			return myButtonData1.Data;
-		}
-	}
+        private List<ImageEntity> GetElementThumbnails(Document doc)
+        {
+            List<ImageEntity> imageData = new List<ImageEntity>();
+
+            // Define a filtered element collector to get all element types
+            FilteredElementCollector collector = new FilteredElementCollector(doc).WhereElementIsElementType();
+
+            foreach (ElementType elementType in collector)
+            {
+                // Get the preview image of the element type
+                Image previewImage = elementType.GetPreviewImage(new Size(100, 100)); // Adjust size as needed
+
+                if (previewImage != null)
+                {
+                    // Convert Image to BitmapSource
+                    // Assuming you have an ImageEntity class with Name and Image properties
+                    ImageEntity imageEntity = new ImageEntity();
+                    imageEntity.Name = elementType.Name;
+                    imageEntity.Image = previewImage; // Assuming ImageEntity has Image property of type Image
+                    imageData.Add(imageEntity);
+                }
+            }
+
+            return imageData;
+        }
+
+        internal static PushButtonData GetButtonData()
+        {
+            // use this method to define the properties for this command in the Revit ribbon
+            string buttonInternalName = "btnCommand1";
+            string buttonTitle = "Button 1";
+
+            ButtonDataClass myButtonData1 = new ButtonDataClass(
+                buttonInternalName,
+                buttonTitle,
+                MethodBase.GetCurrentMethod().DeclaringType?.FullName,
+                Properties.Resources.Blue_32,
+                Properties.Resources.Blue_16,
+                "This is a tooltip for Button 1");
+
+            return myButtonData1.Data;
+        }
+    }
 }
